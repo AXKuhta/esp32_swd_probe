@@ -69,10 +69,6 @@ public:
 
 CustomHIDDevice Device;
 
-const int buttonPin = 0;
-int previousButtonState = HIGH;
-uint8_t axis[8];
-
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, 1);
@@ -82,8 +78,6 @@ void setup() {
   // https://github.com/espressif/arduino-esp32/blob/master/cores/esp32/USB.cpp#L312
   // Warning: USB CDC on boot must be disabled
   USB.productName("ESP32 CMSIS-DAP"); 
-
-  pinMode(buttonPin, INPUT_PULLUP);
 
   // USB setup
   Device.begin();

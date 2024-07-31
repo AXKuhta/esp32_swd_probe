@@ -92,32 +92,13 @@ void setup() {
 }
 
 void loop() {
-  // HID.ready() what?
-  delay(10);
-
   if (Vendor.available()) {
-    uint32_t response_size = TU_MIN(sizeof(RxDataBuffer), Vendor.available());
+    Vendor.read(RxDataBuffer, sizeof(RxDataBuffer));
 
-    Vendor.read(RxDataBuffer, response_size);
     uint32_t sz = DAP_ProcessCommand(RxDataBuffer, TxDataBuffer) & 0xFFFF;
 
-    if (sz) {
-      Vendor.write(TxDataBuffer, sz);
-      Vendor.flush();
-    }
-
-    for (int i = 0; i < sizeof(RxDataBuffer); i++)
-      USBSerial.printf("%02x ", RxDataBuffer[i]);
-
-    if (sz) {
-      USBSerial.println();
-
-      for (int i = 0; i < sz; i++)
-        USBSerial.printf("%02x ", TxDataBuffer[i]);
-    }
-
-    USBSerial.println();
-    USBSerial.println();
+    Vendor.write(TxDataBuffer, sz);
+    Vendor.flush();
   }
 }
 #endif /* ARDUINO_USB_MODE */

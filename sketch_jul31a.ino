@@ -8,12 +8,17 @@ void loop() {}
 #else
 #include "USB.h"
 #include "USBHID.h"
-
-USBHID HID;
-USBCDC USBSerial; // Provides USB reflash
+#include "USBVendor.h"
 
 #include "DAP_config.h"
 #include "DAP.h"
+
+static uint8_t TxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
+static uint8_t RxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
+
+USBCDC USBSerial; // Provides USB reflash
+USBVendor Vendor; // Faster?
+USBHID HID;
 
 // https://github.com/raspberrypi/debugprobe/blob/master/src/usb_descriptors.c#L91
 static const uint8_t report_descriptor[] = {
@@ -22,7 +27,7 @@ static const uint8_t report_descriptor[] = {
 
 class CustomHIDDevice : public USBHIDDevice {
 public:
-  uint8_t TxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
+  //uint8_t TxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
   //uint8_t RxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
 
   CustomHIDDevice(void) {
@@ -81,13 +86,38 @@ void setup() {
 
   // USB setup
   Device.begin();
+  Vendor.begin();
   USBSerial.begin();
   USB.begin();
 }
 
 void loop() {
   // HID.ready() what?
-  //USBSerial.println("a\n");
-  //delay(100);
+  delay(10);
+
+  if (Vendor.available()) {
+    uint32_t response_size = TU_MIN(sizeof(RxDataBuffer), Vendor.available());
+
+    Vendor.read(RxDataBuffer, response_size);
+    uint32_t sz = DAP_ProcessCommand(RxDataBuffer, TxDataBuffer) & 0xFFFF;
+
+    if (sz) {
+      Vendor.write(TxDataBuffer, sz);
+      Vendor.flush();
+    }
+
+    for (int i = 0; i < sizeof(RxDataBuffer); i++)
+      USBSerial.printf("%02x ", RxDataBuffer[i]);
+
+    if (sz) {
+      USBSerial.println();
+
+      for (int i = 0; i < sz; i++)
+        USBSerial.printf("%02x ", TxDataBuffer[i]);
+    }
+
+    USBSerial.println();
+    USBSerial.println();
+  }
 }
 #endif /* ARDUINO_USB_MODE */

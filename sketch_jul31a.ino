@@ -16,15 +16,16 @@ void loop() {}
 static uint8_t TxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
 static uint8_t RxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
 
-USBCDC USBSerial; // Provides USB reflash
-USBVendor Vendor; // Faster?
-USBHID HID;
-
 // https://github.com/raspberrypi/debugprobe/blob/master/src/usb_descriptors.c#L91
 static const uint8_t report_descriptor[] = {
   TUD_HID_REPORT_DESC_GENERIC_INOUT(CFG_TUD_HID_EP_BUFSIZE)
 };
 
+USBCDC USBSerial; // Provides USB reflash
+USBVendor Vendor; // CMSIS-DAPv2
+USBHID HID;
+
+// Plain CMSIS-DAP
 class CustomHIDDevice : public USBHIDDevice {
 public:
   //uint8_t TxDataBuffer[CFG_TUD_HID_EP_BUFSIZE];
@@ -58,17 +59,12 @@ public:
   void _onSetFeature(uint8_t report_id, const uint8_t *buffer, uint16_t len) {
     uint32_t response_size = TU_MIN(CFG_TUD_HID_EP_BUFSIZE, len);
 
-    //USBSerial.printf("SETFEATURE\n");
-
     // https://github.com/raspberrypi/debugprobe/blob/master/src/main.c#L145
     // https://github.com/myelin/arduino-cmsis-dap/blob/master/arduino-cmsis-dap.ino#L122
-    uint32_t sz = DAP_ProcessCommand( (uint8_t*)buffer, TxDataBuffer);
+    uint32_t sz = DAP_ProcessCommand( (uint8_t*)buffer, TxDataBuffer) & 0xFFFF;
 
-    if (sz) {
-      HID.SendReport(0, TxDataBuffer, response_size);
-    }
-
-    //USBSerial.printf("OUT\n");
+    // Note timeout set to 0
+    HID.SendReport(0, TxDataBuffer, sz, 0);
   }
 };
 

@@ -70,24 +70,20 @@ public:
 
 CustomHIDDevice Device;
 
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, 1);
-
+void init_usb() {
   // Change product name so OpenOCD recognizes us
   // https://github.com/myelin/arduino-cmsis-dap/blob/master/arduino-cmsis-dap.ino#L43
   // https://github.com/espressif/arduino-esp32/blob/master/cores/esp32/USB.cpp#L312
   // Warning: USB CDC on boot must be disabled
   USB.productName("ESP32 CMSIS-DAP"); 
 
-  // USB setup
   Device.begin();
   Vendor.begin();
   USBSerial.begin();
   USB.begin();
 }
 
-void loop() {
+void handle_vendor() {
   if (Vendor.available()) {
     Vendor.read(RxDataBuffer, sizeof(RxDataBuffer));
 
@@ -96,5 +92,79 @@ void loop() {
     Vendor.write(TxDataBuffer, sz);
     Vendor.flush();
   }
+}
+
+//
+// 3.3V --> ? ohms --> MEASURE --> 2.5 ohms --> GND
+//
+// ADC range: 0 mV - 750 mV
+//
+
+uint8_t adc_pins[] = {1};
+uint8_t adc_pins_count = sizeof(adc_pins) / sizeof(uint8_t);
+
+// Calibration's broken
+#define ADC_TO_MV (750.0/4096)
+
+double mv_to_ohms(double mv) {
+  double y = (3300.0 - mv) / 3300.0;
+  double r = -2.5 - 2.5/(y - 1);
+
+  return r;
+}
+
+int adc_results_pending = 0;
+
+void IRAM_ATTR adc_callback() {
+  adc_results_pending = 1;
+}
+
+void handle_adc() {
+  adc_continuous_data_t *result = NULL;
+
+  if (!adc_results_pending)
+    return;
+
+  if (analogContinuousRead(&result, 0)) {
+    for (int i = 0; i < adc_pins_count; i++) {
+      double ohms = mv_to_ohms(result[i].avg_read_raw * ADC_TO_MV);
+      int milliamps = int(3300.0 / ohms + 0.5);
+
+      USBSerial.printf("\nADC PIN %d data:"
+                       "\n   Avg raw value = %d"
+                       "\n   Avg millivolts (BROKEN) value = %d"
+                       "\n   Avg millivolts (FIX) value = %d"
+                       "\n   ohms = %lf"
+                       "\n     mA = %d", result[i].pin, result[i].avg_read_raw, result[i].avg_read_mvolts, int(result[i].avg_read_raw * ADC_TO_MV + 0.5), ohms, milliamps);
+
+      USBSerial.flush();
+    }
+
+    adc_results_pending = 0;
+  }
+}
+
+void init_adc() {
+  analogContinuousSetAtten(ADC_0db);
+
+  uint32_t conversions_per_pin = 2000;
+  uint32_t samplerate = conversions_per_pin * 10;
+
+  // https://github.com/espressif/arduino-esp32/blob/master/docs/en/api/adc.rst
+  analogContinuous( adc_pins, adc_pins_count, conversions_per_pin, samplerate, &adc_callback );
+  analogContinuousStart();
+}
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, 1);
+
+  init_usb();
+  init_adc();
+}
+
+void loop() {
+  handle_vendor();
+  handle_adc();
 }
 #endif /* ARDUINO_USB_MODE */

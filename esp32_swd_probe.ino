@@ -166,5 +166,15 @@ void setup() {
 void loop() {
   handle_vendor();
   handle_adc();
+
+  // A small powersaving measure
+  // Tested to be effective
+  //
+  // ESP-IDF does this when all FreeRTOS tasks are blocked... which is never?
+  // Not unless we do a delay(1) in the main loop
+  //
+  // We can escape the latency of delay(1) and still have some power savings if we do a waiti manually
+  //
+  cpu_ll_waiti();
 }
 #endif /* ARDUINO_USB_MODE */

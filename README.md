@@ -22,7 +22,7 @@ ADC PIN 1 data:
      mA = 99
 ```
 
-Verify current readings by substituting RP2040 with a 100 ohm resistor.
+Verify current readings by substituting the RP2040 board with a 100 ohm resistor.
 
 Wiring diagram:
 
